@@ -96,3 +96,51 @@
     justify-content: center;
   }
 }
+
+.inputLabel {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+  margin-top: 12px;
+}
+
+.inputField {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border: 1px solid #1e293b;
+  background: #020617;
+  color: #fff;
+  font-size: 14px;
+}
+
+.submitButton {
+  width: 100%;
+  padding: 12px;
+  margin-top: 16px;
+  border-radius: 8px;
+  background: #6366f1;
+  border: none;
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.submitButton:hover {
+  background: #4f46e5;
+}
+
+.footer {
+  margin-top: 12px;
+  text-align: right;
+}
+
+.forgetLink {
+  color: #6366f1;
+  text-decoration: underline;
+  font-size: 14px;
+  cursor: pointer;
+}

@@ -26,7 +26,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      /* 1️⃣ Organization */
+      // 1️⃣ Check organization
       const { data: organization } = await supabase
         .from("organizations")
         .select("id, status")
@@ -37,7 +37,7 @@ export default function LoginPage() {
         throw new Error("Invalid organization code");
       }
 
-      /* 2️⃣ User (CASE INSENSITIVE) */
+      // 2️⃣ Check user (case-insensitive)
       const { data: user, error: userError } = await supabase
         .from("users")
         .select("id, status, password, password_expires_at")
@@ -48,12 +48,12 @@ export default function LoginPage() {
       if (userError || !user) throw new Error("User not found");
       if (user.status !== "active") throw new Error("User inactive");
 
-      /* 3️⃣ Password */
+      // 3️⃣ Password
       if (user.password !== password) {
         throw new Error("Invalid password");
       }
 
-      /* 4️⃣ Expiry */
+      // 4️⃣ Password expiry
       if (
         user.password_expires_at &&
         new Date(user.password_expires_at) < new Date()
@@ -61,7 +61,7 @@ export default function LoginPage() {
         throw new Error("Password expired");
       }
 
-      /* 5️⃣ Roles */
+      // 5️⃣ Get roles
       const { data: roles } = await supabase
         .from("user_roles")
         .select("roles(name)")
@@ -69,7 +69,7 @@ export default function LoginPage() {
 
       const roleNames = roles?.map((r: any) => r.roles.name) || [];
 
-      /* 6️⃣ Redirect */
+      // 6️⃣ Redirect based on role
       if (roleNames.includes("Super admin")) {
         router.push("/organization/overview");
       } else if (
@@ -96,39 +96,49 @@ export default function LoginPage() {
 
       <div className={styles.right}>
         <form className={styles.card} onSubmit={handleSubmit}>
-          <h2>Sign in</h2>
+          <h2 className={styles.heading}>Sign in</h2>
 
           {error && <p className={styles.error}>{error}</p>}
 
-          <label>Email</label>
+          <label className={styles.inputLabel}>Email</label>
           <input
+            type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            type="email"
+            className={styles.inputField}
             required
           />
 
-          <label>Password</label>
+          <label className={styles.inputLabel}>Password</label>
           <input
+            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            type="password"
+            className={styles.inputField}
             required
           />
 
-          <label>Organization Code</label>
+          <label className={styles.inputLabel}>Organization Code</label>
           <input
+            type="text"
             value={orgCode}
             onChange={(e) => setOrgCode(e.target.value)}
+            className={styles.inputField}
             required
           />
 
-          <button disabled={loading}>
+          <button
+            type="submit"
+            className={styles.submitButton}
+            disabled={loading}
+          >
             {loading ? "Signing in..." : "Login"}
           </button>
 
           <div className={styles.footer}>
-            <Link href="/forgot-password">Forgot password?</Link>
+            <Link href="/forget-password" className={styles.forgetLink}>
+              Forgot password?
+            </Link>
           </div>
         </form>
       </div>
