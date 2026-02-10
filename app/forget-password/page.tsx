@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@supabase/supabase-js";
 import styles from "./forget-password.module.css";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
 
 export default function ForgetPasswordPage() {
   const [email, setEmail] = useState("");
@@ -22,40 +16,25 @@ export default function ForgetPasswordPage() {
     setLoading(true);
 
     try {
-      // Case-insensitive email check using ilike
-      const { data: user } = await supabase
-        .from("users")
-        .select("*")
-        .ilike("email", email.trim())
-        .single();
+      // Convert email to lowercase before sending to API
+      const normalizedEmail = email.trim().toLowerCase();
 
-      if (!user) {
-        setError("Email not found");
-        return;
+      const res = await fetch("/api/forget-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Something went wrong");
       }
-
-      // Generate temporary token
-      const token = Math.random().toString(36).substring(2, 12); // 10 char token
-      const expiry = new Date();
-      expiry.setHours(expiry.getHours() + 1); // 1 hour expiry
-
-      // Store token in DB
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({
-          reset_token: token,
-          reset_token_expires_at: expiry.toISOString(),
-        })
-        .eq("id", user.id);
-
-      if (updateError) throw updateError;
-
-      // Normally send email here; for demo console log
-      console.log(`Reset link: https://yourapp.com/reset-password?token=${token}`);
 
       setSuccess("Password reset link has been sent to your email!");
       setEmail("");
-
     } catch (err: any) {
       setError(err.message);
     } finally {
