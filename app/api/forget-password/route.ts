@@ -1,97 +1,69 @@
+// app/api/forget-password/route.ts
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! // IMPORTANT: server-side only
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
+    if (!email) return NextResponse.json({ error: "Email required" }, { status: 400 });
 
-    if (!email) {
-      return NextResponse.json(
-        { error: "Email is required" },
-        { status: 400 }
-      );
-    }
+    const trimmedEmail = email.trim();
 
-    // Check user exists
-    const { data: user } = await supabase
+    // Case-insensitive search for user
+    const { data: users, error: findError } = await supabase
       .from("users")
-      .select("id,email")
-      .ilike("email", email)
-      .single();
+      .select("*")
+      .ilike("email", trimmedEmail)
+      .limit(1);
 
-    if (!user) {
-      return NextResponse.json(
-        { error: "Email not found" },
-        { status: 404 }
-      );
-    }
+    if (findError) return NextResponse.json({ error: "Error finding user" }, { status: 500 });
+    if (!users || users.length === 0) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    const user = users[0];
 
     // Generate temp password
-    const tempPassword = Math.random().toString(36).slice(-10);
+    const tempPassword = Math.random().toString(36).slice(-8);
 
-    // Update DB: temp password + force change flag
+    // Update user: must_change_password + temp password
     const { error: updateError } = await supabase
       .from("users")
       .update({
         temp_password: tempPassword,
-        must_change_password: true,
+        must_change_password: true
       })
       .eq("id", user.id);
 
     if (updateError) throw updateError;
 
-    // Prepare Brevo email
-    const BREVO_API_KEY = process.env.BREVO_API_KEY!;
-    const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL!;
-    const SENDER_NAME = process.env.BREVO_SENDER_NAME!;
-    const APP_URL = process.env.NEXT_PUBLIC_APP_URL!;
-
-    const resetLink = `${APP_URL}/reset-password?token=${tempPassword}`;
-
-    // Send email via Brevo
-    const brevoRes = await fetch("https://api.brevo.com/v3/smtp/email", {
+    // Send email via Brevo — 🟢 single line htmlContent to avoid unterminated template
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "api-key": BREVO_API_KEY,
+        "Content-Type": "application/json",
+        "api-key": process.env.BREVO_API_KEY!,
       },
       body: JSON.stringify({
-        sender: {
-          name: SENDER_NAME,
-          email: SENDER_EMAIL,
-        },
-        to: [{ email: user.email }],
-        subject: "ReleaseGuard – Password Reset",
-        htmlContent: `
-          <p>Hello,</p>
-          <p>You requested a password reset. Your temporary password is:</p>
-          <h2>${tempPassword}</h2>
-          <p>Login and change your password immediately.</p>
-          <p>Or click this link to reset: <a href="${resetLink}">${resetLink}</a></p>
-        `,
-      }),
+        sender: { name: process.env.BREVO_SENDER_NAME, email: process.env.BREVO_SENDER_EMAIL },
+        to: [{ email: trimmedEmail }],
+        subject: "Temporary Password",
+        htmlContent: `<p>Your temporary password is: <strong>${tempPassword}</strong></p><p>Please login and set a new password.</p>`
+      })
     });
 
-    if (!brevoRes.ok) {
-      const errorText = await brevoRes.text();
-      throw new Error(`Brevo email failed: ${errorText}`);
+    if (!res.ok) {
+      const errText = await res.text();
+      console.log("Brevo error:", errText);
+      return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Temporary password sent to your email",
-    });
-
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "Temporary password sent" });
+  } catch (err: any) {
+    console.log("Catch error:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -9,34 +9,51 @@ export default function ForgetPasswordPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const normalizeEmail = (value: string) => {
+    return value.trim().toLowerCase();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     setError(null);
     setSuccess(null);
     setLoading(true);
 
     try {
-      // Convert email to lowercase before sending to API
-      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedEmail = normalizeEmail(email);
+
+      if (!normalizedEmail) {
+        throw new Error("Email is required");
+      }
 
       const res = await fetch("/api/forget-password", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify({
+          email: normalizedEmail,
+        }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Something went wrong");
+      // safe JSON parsing (important)
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("Server response invalid");
       }
 
-      setSuccess("Password reset link has been sent to your email!");
+      if (!res.ok) {
+        throw new Error(data?.error || "Request failed");
+      }
+
+      setSuccess("Temporary password has been sent to your email.");
       setEmail("");
+
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -55,7 +72,7 @@ export default function ForgetPasswordPage() {
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(normalizeEmail(e.target.value))}
             className={styles.inputField}
             required
           />

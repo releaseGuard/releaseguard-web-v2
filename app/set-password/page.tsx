@@ -23,9 +23,9 @@ export default function SetPasswordPage() {
 
   const validatePassword = (pwd: string) => {
     if (pwd.length > 16) return "Password must be max 16 characters";
-    if (!/[A-Z]/.test(pwd)) return "Password must contain at least 1 uppercase letter";
-    if (!/[0-9]/.test(pwd)) return "Password must contain at least 1 number";
-    if (!/[!@#$%^&*(),.?\":{}|<>]/.test(pwd)) return "Password must contain at least 1 special character";
+    if (!/[A-Z]/.test(pwd)) return "Password must contain uppercase letter";
+    if (!/[0-9]/.test(pwd)) return "Password must contain number";
+    if (!/[!@#$%^&*(),.?\":{}|<>]/.test(pwd)) return "Password must contain special character";
     return null;
   };
 
@@ -46,25 +46,39 @@ export default function SetPasswordPage() {
     }
 
     setLoading(true);
+
     try {
+      // verify user still requires change
+      const { data: user } = await supabase
+        .from("users")
+        .select("must_change_password")
+        .eq("id", userId)
+        .single();
+
+      if (!user || !user.must_change_password) {
+        throw new Error("Password reset session expired.");
+      }
+
+      // ✅ PERMANENT PASSWORD SAVE
       const { error: updateError } = await supabase
         .from("users")
         .update({
-          password,
-          password_expires_at: new Date(new Date().setMonth(new Date().getMonth() + 3)).toISOString(),
+          password: password,
+          temp_password: null,
+          must_change_password: false,
+          password_expires_at: new Date(
+            new Date().setMonth(new Date().getMonth() + 3)
+          ).toISOString(),
         })
         .eq("id", userId);
 
       if (updateError) throw updateError;
 
-      setSuccess("Password set successfully! You can now login.");
+      setSuccess("Password set successfully! Please login.");
       setPassword("");
       setConfirmPassword("");
 
-      // Auto redirect to login after 2 seconds
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
+      setTimeout(() => router.push("/login"), 2000);
 
     } catch (err: any) {
       setError(err.message);
@@ -74,7 +88,7 @@ export default function SetPasswordPage() {
   };
 
   useEffect(() => {
-    if (!userId) router.push("/signup");
+    if (!userId) router.push("/login");
   }, [userId]);
 
   return (
@@ -104,11 +118,7 @@ export default function SetPasswordPage() {
             required
           />
 
-          <button
-            type="submit"
-            className={styles.submitButton}
-            disabled={loading}
-          >
+          <button type="submit" className={styles.submitButton} disabled={loading}>
             {loading ? "Saving..." : "Set Password"}
           </button>
         </form>

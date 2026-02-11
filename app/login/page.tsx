@@ -1,3 +1,4 @@
+// login/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -13,7 +14,6 @@ const supabase = createClient(
 
 export default function LoginPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [orgCode, setOrgCode] = useState("");
@@ -26,62 +26,69 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // 1️⃣ Check organization
-      const { data: organization } = await supabase
+      const normalizedEmail = email.trim();
+
+      // 1️⃣ Organization
+      const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .select("id, status")
-        .eq("code", orgCode)
+        .eq("code", orgCode.trim())
         .single();
 
-      if (!organization || organization.status !== "active") {
+      if (orgError || !organization || organization.status !== "active") {
         throw new Error("Invalid organization code");
       }
 
-      // 2️⃣ Check user (case-insensitive)
+      // 2️⃣ User
       const { data: user, error: userError } = await supabase
         .from("users")
-        .select("id, status, password, password_expires_at")
+        .select(`
+          id,
+          status,
+          password,
+          temp_password,
+          must_change_password,
+          password_expires_at
+        `)
         .eq("organization_id", organization.id)
-        .ilike("email", email.trim())
+        .ilike("email", normalizedEmail)
         .single();
 
       if (userError || !user) throw new Error("User not found");
       if (user.status !== "active") throw new Error("User inactive");
 
-      // 3️⃣ Password
-      if (user.password !== password) {
+      // 3️⃣ TEMP PASSWORD / FORCE CHANGE
+      if (user.must_change_password) {
+        if (!user.temp_password || password !== user.temp_password) {
+          throw new Error("Invalid temporary password");
+        }
+        router.push(`/set-password?userId=${user.id}`);
+        return;
+      }
+
+      // 4️⃣ PERMANENT PASSWORD LOGIN ONLY IF NO FORCE RESET
+      if (!user.must_change_password && password !== user.password) {
         throw new Error("Invalid password");
       }
 
-      // 4️⃣ Password expiry
-      if (
-        user.password_expires_at &&
-        new Date(user.password_expires_at) < new Date()
-      ) {
-        throw new Error("Password expired");
+      // 5️⃣ Password expiry
+      if (user.password_expires_at && new Date(user.password_expires_at) < new Date()) {
+        throw new Error("Password expired. Please reset your password.");
       }
 
-      // 5️⃣ Get roles
+      // 6️⃣ Roles & redirect
       const { data: roles } = await supabase
         .from("user_roles")
         .select("roles(name)")
         .eq("user_id", user.id);
-
       const roleNames = roles?.map((r: any) => r.roles.name) || [];
 
-      // 6️⃣ Redirect based on role
-      if (roleNames.includes("Super admin")) {
-        router.push("/organization/overview");
-      } else if (
-        roleNames.includes("QA lead") ||
-        roleNames.includes("Dev Lead")
-      ) {
-        router.push("/projects");
-      } else {
-        router.push("/my-work");
-      }
+      if (roleNames.includes("Super admin")) router.push("/organization/overview");
+      else if (roleNames.includes("QA lead") || roleNames.includes("Dev Lead")) router.push("/projects");
+      else router.push("/my-work");
+
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -101,44 +108,20 @@ export default function LoginPage() {
           {error && <p className={styles.error}>{error}</p>}
 
           <label className={styles.inputLabel}>Email</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={styles.inputField}
-            required
-          />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={styles.inputField} required />
 
           <label className={styles.inputLabel}>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={styles.inputField}
-            required
-          />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={styles.inputField} required />
 
           <label className={styles.inputLabel}>Organization Code</label>
-          <input
-            type="text"
-            value={orgCode}
-            onChange={(e) => setOrgCode(e.target.value)}
-            className={styles.inputField}
-            required
-          />
+          <input type="text" value={orgCode} onChange={(e) => setOrgCode(e.target.value)} className={styles.inputField} required />
 
-          <button
-            type="submit"
-            className={styles.submitButton}
-            disabled={loading}
-          >
+          <button type="submit" className={styles.submitButton} disabled={loading}>
             {loading ? "Signing in..." : "Login"}
           </button>
 
           <div className={styles.footer}>
-            <Link href="/forget-password" className={styles.forgetLink}>
-              Forgot password?
-            </Link>
+            <Link href="/forget-password" className={styles.forgetLink}>Forgot password?</Link>
           </div>
         </form>
       </div>
