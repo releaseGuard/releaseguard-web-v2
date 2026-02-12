@@ -1,11 +1,14 @@
+/* WRAPPER */
 .wrapper {
   display: flex;
   min-height: 100vh;
-  background: #0f172a;
   color: #fff;
   width: 100%;
   overflow: hidden; /* scroll remove */
+  background: radial-gradient(circle at top left, #1e293b, #020617 60%, #000);
 }
+
+/* LEFT SIDE */
 .left {
   flex: 1;
   padding: 80px;
@@ -14,6 +17,7 @@
   flex-direction: column;
   justify-content: center;
 }
+
 .logo {
   font-size: 36px;
   font-weight: 700;
@@ -24,6 +28,7 @@
   opacity: 0.85;
 }
 
+/* RIGHT SIDE */
 .right {
   flex: 1;
   display: flex;
@@ -31,57 +36,140 @@
   justify-content: center;
   padding: 20px;
 }
+
+/* CARD WITH GLASS + HOVER GLOW */
 .card {
   width: 100%;
   max-width: 420px;
-  background: #020617;
-  border: 1px solid #1e293b;
   padding: 32px;
-  border-radius: 12px;
+  border-radius: 16px;
+
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+
+  border: 1px solid rgba(255,255,255,0.12);
+
+  box-shadow:
+    0 10px 40px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+
+  transition: box-shadow 0.3s ease, border 0.3s ease;
 }
 
+.card:hover {
+  box-shadow:
+    0 0 30px rgba(99,102,241,0.7),
+    0 0 60px rgba(99,102,241,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.05);
+  border: 1px solid rgba(99,102,241,0.5);
+}
 
+/* HEADING */
+.heading {
+  margin-bottom: 20px;
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 0 6px rgba(99,102,241,0.7);
+}
+
+/* ERROR MESSAGES */
 .error {
-  background: #7f1d1d;
+  background: rgba(127, 29, 29, 0.85);
   color: #fecaca;
   padding: 10px;
   border-radius: 8px;
   margin-bottom: 16px;
+  text-align: center;
+  font-size: 14px;
+  transition: box-shadow 0.3s ease;
 }
 
-/* 👇 PURE selectors FIXED */
+.error:hover {
+  box-shadow: 0 0 12px rgba(255,0,0,0.5);
+}
+
+/* CARD LABELS */
 .card label {
   display: block;
   font-size: 14px;
   margin-bottom: 6px;
 }
 
-.card input {
+/* INPUT FIELDS WITH FOCUS GLOW */
+.card input,
+.card select,
+.inputField {
   width: 100%;
   padding: 12px;
   margin-bottom: 16px;
-  border-radius: 8px;
-  border: 1px solid #1e293b;
-  background: #020617;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #fff;
+  font-size: 14px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: border 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card input:focus,
+.card select:focus,
+.inputField:focus {
+  border: 1px solid #6366f1;
+  box-shadow: 0 0 10px rgba(99,102,241,0.6);
+  outline: none;
+}
+
+/* SELECT OPTIONS STYLE */
+.card select option {
+  background: rgba(2,6,23,0.9);
   color: #fff;
 }
 
-.card button {
+/* BUTTON WITH GLOW */
+.card button,
+.submitButton {
   width: 100%;
   padding: 12px;
-  border-radius: 8px;
-  background: #6366f1;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
   border: none;
   color: #fff;
   font-weight: 600;
+  font-size: 16px;
   cursor: pointer;
+  box-shadow: 0 0 20px rgba(99,102,241,0.4);
+  transition: all 0.25s ease, box-shadow 0.25s ease;
 }
 
+.card button:hover,
+.submitButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 30px rgba(99,102,241,0.7), 0 0 60px rgba(99,102,241,0.4);
+}
+
+/* FORGET LINK */
+.forgetLink {
+  color: #6366f1;
+  text-decoration: underline;
+  font-size: 14px;
+  cursor: pointer;
+  transition: text-shadow 0.3s ease;
+}
+
+.forgetLink:hover {
+  text-shadow: 0 0 6px rgba(99,102,241,0.7);
+}
+
+/* FOOTER */
 .footer {
-  margin-top: 16px;
-  text-align: center;
+  margin-top: 12px;
+  text-align: right;
 }
 
+/* MOBILE */
 @media (max-width: 768px) {
   .wrapper {
     flex-direction: column;
@@ -95,52 +183,4 @@
     height: 100vh;
     justify-content: center;
   }
-}
-
-.inputLabel {
-  display: block;
-  font-size: 14px;
-  margin-bottom: 6px;
-  margin-top: 12px;
-}
-
-.inputField {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 12px;
-  border-radius: 8px;
-  border: 1px solid #1e293b;
-  background: #020617;
-  color: #fff;
-  font-size: 14px;
-}
-
-.submitButton {
-  width: 100%;
-  padding: 12px;
-  margin-top: 16px;
-  border-radius: 8px;
-  background: #6366f1;
-  border: none;
-  color: #fff;
-  font-weight: 600;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.submitButton:hover {
-  background: #4f46e5;
-}
-
-.footer {
-  margin-top: 12px;
-  text-align: right;
-}
-
-.forgetLink {
-  color: #6366f1;
-  text-decoration: underline;
-  font-size: 14px;
-  cursor: pointer;
 }
