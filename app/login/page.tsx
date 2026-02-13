@@ -57,35 +57,28 @@ export default function LoginPage() {
       if (userError || !user) throw new Error("User not found");
       if (user.status !== "active") throw new Error("User inactive");
 
-      // 3️⃣ TEMP PASSWORD / FORCE CHANGE
+      // 3️⃣ TEMP PASSWORD → FORCE CHANGE
       if (user.must_change_password) {
         if (!user.temp_password || password !== user.temp_password) {
           throw new Error("Invalid temporary password");
         }
+
         router.push(`/set-password?userId=${user.id}`);
         return;
       }
 
-      // 4️⃣ PERMANENT PASSWORD LOGIN ONLY IF NO FORCE RESET
-      if (!user.must_change_password && password !== user.password) {
+      // 4️⃣ PERMANENT PASSWORD CHECK
+      if (password !== user.password) {
         throw new Error("Invalid password");
       }
 
-      // 5️⃣ Password expiry
+      // 5️⃣ Password expiry check
       if (user.password_expires_at && new Date(user.password_expires_at) < new Date()) {
         throw new Error("Password expired. Please reset your password.");
       }
 
-      // 6️⃣ Roles & redirect
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("roles(name)")
-        .eq("user_id", user.id);
-      const roleNames = roles?.map((r: any) => r.roles.name) || [];
-
-      if (roleNames.includes("Super admin")) router.push("/organization/overview");
-      else if (roleNames.includes("QA lead") || roleNames.includes("Dev Lead")) router.push("/projects");
-      else router.push("/my-work");
+      // ✅ 6️⃣ SUCCESS LOGIN → DASHBOARD
+      router.push("/dashboard");
 
     } catch (err: any) {
       setError(err.message || "Login failed");
@@ -108,20 +101,40 @@ export default function LoginPage() {
           {error && <p className={styles.error}>{error}</p>}
 
           <label className={styles.inputLabel}>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={styles.inputField} required />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={styles.inputField}
+            required
+          />
 
           <label className={styles.inputLabel}>Password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={styles.inputField} required />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={styles.inputField}
+            required
+          />
 
           <label className={styles.inputLabel}>Organization Code</label>
-          <input type="text" value={orgCode} onChange={(e) => setOrgCode(e.target.value)} className={styles.inputField} required />
+          <input
+            type="text"
+            value={orgCode}
+            onChange={(e) => setOrgCode(e.target.value)}
+            className={styles.inputField}
+            required
+          />
 
           <button type="submit" className={styles.submitButton} disabled={loading}>
             {loading ? "Signing in..." : "Login"}
           </button>
 
           <div className={styles.footer}>
-            <Link href="/forget-password" className={styles.forgetLink}>Forgot password?</Link>
+            <Link href="/forget-password" className={styles.forgetLink}>
+              Forgot password?
+            </Link>
           </div>
         </form>
       </div>
