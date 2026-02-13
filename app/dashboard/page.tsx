@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation"; // ✅ router import
 import styles from "./dashboard.module.css";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,17 +11,18 @@ const supabase = createClient(
 );
 
 export default function DashboardPage() {
+  const router = useRouter(); // ✅ router instance
   const [activeMenu, setActiveMenu] = useState("Projects");
   const [showDropdown, setShowDropdown] = useState(false);
 
   const [firstName, setFirstName] = useState("U");
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
-  // 🔥 USER LOAD FROM DB
+  const profileRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const loadUser = async () => {
       try {
-        // ⚠ assume userId login ke baad localStorage me save hai
         const userId = localStorage.getItem("userId");
         if (!userId) return;
 
@@ -32,13 +34,8 @@ export default function DashboardPage() {
 
         if (error || !data) return;
 
-        if (data.first_name) {
-          setFirstName(data.first_name);
-        }
-
-        if (data.profile_image_url) {
-          setProfileImage(data.profile_image_url);
-        }
+        if (data.first_name) setFirstName(data.first_name);
+        if (data.profile_image_url) setProfileImage(data.profile_image_url);
       } catch (err) {
         console.log(err);
       }
@@ -57,13 +54,40 @@ export default function DashboardPage() {
     "Reports",
   ];
 
+  // ✅ Click outside to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        profileRef.current &&
+        !profileRef.current.contains(event.target as Node)
+      ) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // ✅ Logout handler
+  const handleLogout = async () => {
+    // Supabase sign out
+    await supabase.auth.signOut();
+
+    // Clear localStorage if userId stored
+    localStorage.removeItem("userId");
+
+    // Redirect to login page
+    router.push("/login");
+  };
+
   return (
     <div className={styles.wrapper}>
-      
       {/* SIDEBAR */}
       <aside className={styles.sidebar}>
         <div className={styles.logo}>ReleaseGuard</div>
-
         {menuItems.map((item) => (
           <div
             key={item}
@@ -79,12 +103,11 @@ export default function DashboardPage() {
 
       {/* MAIN */}
       <div className={styles.main}>
-        
         {/* TOPBAR */}
         <header className={styles.topbar}>
           <div className={styles.pageTitle}>Dashboard</div>
 
-          <div className={styles.profileWrapper}>
+          <div className={styles.profileWrapper} ref={profileRef}>
             <div
               className={styles.profileIcon}
               onClick={() => setShowDropdown(!showDropdown)}
@@ -105,7 +128,13 @@ export default function DashboardPage() {
                 <div className={styles.dropdownItem}>Profile</div>
                 <div className={styles.dropdownItem}>Theme</div>
                 <div className={styles.dropdownItem}>Change Password</div>
-                <div className={styles.dropdownItem}>Logout</div>
+                {/* ✅ Logout */}
+                <div
+                  className={styles.dropdownItem}
+                  onClick={handleLogout}
+                >
+                  Logout
+                </div>
               </div>
             )}
           </div>
@@ -113,7 +142,6 @@ export default function DashboardPage() {
 
         {/* CONTENT */}
         <div className={styles.content}>
-          
           <div className={styles.card}>
             <div className={styles.cardTitle}>Total Projects</div>
             <div className={styles.cardValue}>12</div>
@@ -133,7 +161,6 @@ export default function DashboardPage() {
             <div className={styles.cardTitle}>Defects Found</div>
             <div className={styles.cardValue}>27</div>
           </div>
-
         </div>
       </div>
     </div>
