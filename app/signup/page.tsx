@@ -12,6 +12,7 @@ const supabase = createClient(
 
 export default function SignupPage() {
   const router = useRouter();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [orgName, setOrgName] = useState("");
@@ -22,8 +23,8 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
 
   const rolesList = [
-    "Super admin",
-    "QA lead",
+    "Super Admin",
+    "QA Lead",
     "QA",
     "Dev Lead",
     "Dev",
@@ -36,21 +37,29 @@ export default function SignupPage() {
     setLoading(true);
 
     try {
-      // 🔹 Duplicate email check
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // =============================
+      // 1️⃣ CHECK DUPLICATE EMAIL
+      // =============================
       const { data: existingUser } = await supabase
         .from("users")
         .select("id")
-        .eq("email", email)
-        .single();
+        .ilike("email", normalizedEmail)
+        .maybeSingle();
 
-      if (existingUser) throw new Error("Email already registered");
+      if (existingUser) {
+        throw new Error("Email already registered");
+      }
 
-      // 🔹 Check / Create organization
+      // =============================
+      // 2️⃣ FIND OR CREATE ORGANIZATION
+      // =============================
       let { data: organization } = await supabase
         .from("organizations")
         .select("*")
-        .eq("code", orgCode)
-        .single();
+        .eq("code", orgCode.trim())
+        .maybeSingle();
 
       let orgId = "";
 
@@ -58,9 +67,11 @@ export default function SignupPage() {
         const { data: newOrg, error: orgError } = await supabase
           .from("organizations")
           .insert({
-            name: orgName,
-            code: orgCode,
+            name: orgName.trim(),
+            code: orgCode.trim(),
             status: "active",
+            plan: "free",
+            created_at: new Date().toISOString(),
           })
           .select()
           .single();
@@ -68,66 +79,82 @@ export default function SignupPage() {
         if (orgError || !newOrg)
           throw new Error("Failed to create organization");
 
-        orgId = newOrg.id;
-      } else {
-        orgId = organization.id;
+        organization = newOrg;
       }
 
-      // 🔹 Create user with temporary blank password
-      const { data: newUser, error: userError } = await supabase
-        .from("users")
-        .insert({
-          auth_user_id: null,
-          name,
-          email,
-          organization_id: orgId,
-          status: "active",
-          password: null, // password set later
-          password_expires_at: null,
-        })
-        .select()
-        .single();
+      orgId = organization.id;
 
-      if (userError || !newUser) throw new Error("Failed to create user");
-
-      // 🔹 Get / Create role
-      const { data: roleData } = await supabase
+      // =============================
+      // 3️⃣ FIND OR CREATE ROLE
+      // =============================
+      let { data: roleData } = await supabase
         .from("roles")
         .select("id")
         .eq("organization_id", orgId)
         .eq("name", role)
-        .single();
+        .maybeSingle();
 
       let roleId = "";
 
       if (!roleData) {
-        const { data: newRole } = await supabase
+        const { data: newRole, error: roleError } = await supabase
           .from("roles")
           .insert({
             organization_id: orgId,
             name: role,
             is_system_role: false,
+            created_at: new Date().toISOString(),
           })
           .select()
           .single();
 
-        if (!newRole) throw new Error("Failed to create role");
+        if (roleError || !newRole)
+          throw new Error("Failed to create role");
+
         roleId = newRole.id;
       } else {
         roleId = roleData.id;
       }
 
-      // 🔹 Assign role
-      const { error: userRoleError } = await supabase
-        .from("user_roles")
+      // =============================
+      // 4️⃣ CREATE USER
+      // =============================
+      const { data: newUser, error: userError } = await supabase
+        .from("users")
         .insert({
-          user_id: newUser.id,
-          role_id: roleId,
-        });
+          name: name.trim(),
+          email: normalizedEmail,
+          organization_id: orgId,
+          role_id: roleId, // ✅ NEW SYSTEM
+          status: "active",
+          password: null,
+          temp_password: null,
+          must_change_password: true,
+          password_expires_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-      if (userRoleError) throw new Error("Failed to assign role");
+      if (userError || !newUser)
+        throw new Error("Failed to create user");
 
-      // ✅ Redirect to password set page
+      // =============================
+      // 5️⃣ SET ORG OWNER (FIRST USER)
+      // =============================
+      if (!organization.owner_user_id) {
+        await supabase
+          .from("organizations")
+          .update({
+            owner_user_id: newUser.id,
+          })
+          .eq("id", orgId);
+      }
+
+      // =============================
+      // ✅ REDIRECT TO PASSWORD SETUP
+      // =============================
       router.push(`/set-password?userId=${newUser.id}`);
 
       // reset form
@@ -136,8 +163,9 @@ export default function SignupPage() {
       setOrgName("");
       setOrgCode("");
       setRole("QA");
+
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Signup failed");
     } finally {
       setLoading(false);
     }
@@ -147,16 +175,23 @@ export default function SignupPage() {
     <div className={styles.wrapper}>
       <div className={styles.left}>
         <h1 className={styles.logo}>ReleaseGuard</h1>
-        <p className={styles.tagline}>Control your releases. Eliminate risk.</p>
+        <p className={styles.tagline}>
+          Control your releases. Eliminate risk.
+        </p>
       </div>
 
       <div className={styles.right}>
         <form className={styles.card} onSubmit={handleSubmit}>
           <h2 className={styles.heading}>Sign Up</h2>
+
           {error && <p className={styles.error}>{error}</p>}
 
           <label>Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
 
           <label>Email</label>
           <input
@@ -189,7 +224,9 @@ export default function SignupPage() {
             ))}
           </select>
 
-          <button disabled={loading}>{loading ? "Creating..." : "Sign Up"}</button>
+          <button disabled={loading}>
+            {loading ? "Creating..." : "Sign Up"}
+          </button>
         </form>
       </div>
     </div>

@@ -1,4 +1,3 @@
-// login/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -7,6 +6,24 @@ import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import styles from "./login.module.css";
 
+type UserWithRole = {
+  id: string;
+  status: string;
+  password: string | null;
+  temp_password: string | null;
+  must_change_password: boolean;
+  password_expires_at: string | null;
+  role_id: string;
+  roles:
+    | {
+        name: string;
+      }
+    | {
+        name: string;
+      }[]
+    | null;
+};
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -14,11 +31,15 @@ const supabase = createClient(
 
 export default function LoginPage() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [orgCode, setOrgCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const normalizeRole = (role: string) =>
+    role.trim().toLowerCase().replace(/\s+/g, "-");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +49,7 @@ export default function LoginPage() {
     try {
       const normalizedEmail = email.trim();
 
-      // 1️⃣ Organization
+      // ✅ Organization check
       const { data: organization, error: orgError } = await supabase
         .from("organizations")
         .select("id, status")
@@ -39,7 +60,7 @@ export default function LoginPage() {
         throw new Error("Invalid organization code");
       }
 
-      // 2️⃣ User
+      // ✅ User + Role (FIXED RELATION)
       const { data: user, error: userError } = await supabase
         .from("users")
         .select(`
@@ -48,16 +69,20 @@ export default function LoginPage() {
           password,
           temp_password,
           must_change_password,
-          password_expires_at
+          password_expires_at,
+          role_id,
+          roles:role_id (
+            name
+          )
         `)
         .eq("organization_id", organization.id)
         .ilike("email", normalizedEmail)
-        .single();
+        .single<UserWithRole>();
 
       if (userError || !user) throw new Error("User not found");
       if (user.status !== "active") throw new Error("User inactive");
 
-      // 3️⃣ TEMP PASSWORD → FORCE CHANGE
+      // ✅ Temp password
       if (user.must_change_password) {
         if (!user.temp_password || password !== user.temp_password) {
           throw new Error("Invalid temporary password");
@@ -67,19 +92,65 @@ export default function LoginPage() {
         return;
       }
 
-      // 4️⃣ PERMANENT PASSWORD CHECK
+      // ✅ Password check
       if (password !== user.password) {
         throw new Error("Invalid password");
       }
 
-      // 5️⃣ Password expiry check
-      if (user.password_expires_at && new Date(user.password_expires_at) < new Date()) {
-        throw new Error("Password expired. Please reset your password.");
+      // ✅ Expiry
+      if (
+        user.password_expires_at &&
+        new Date(user.password_expires_at) < new Date()
+      ) {
+        throw new Error("Password expired.");
       }
 
-      // ✅ 6️⃣ SUCCESS LOGIN → DASHBOARD
-      router.push("/dashboard");
+      // ============================
+      // ✅ FINAL ROLE EXTRACTION
+      // ============================
+      let roleName = "";
 
+      if (!user.roles) {
+        throw new Error("User role not assigned");
+      }
+
+      if (Array.isArray(user.roles)) {
+        roleName = user.roles[0]?.name ?? "";
+      } else {
+        roleName = user.roles.name ?? "";
+      }
+
+      roleName = normalizeRole(roleName);
+
+      if (!roleName) {
+        throw new Error("Role missing from database");
+      }
+
+      console.log("✅ FINAL ROLE:", roleName);
+
+      // ✅ Redirect mapping
+      let redirectPath = "/dashboard/company-admin";
+
+      if (roleName === "super-admin")
+        redirectPath = "/dashboard/super-admin";
+      else if (roleName === "qa-lead")
+        redirectPath = "/dashboard/qa-lead";
+      else if (roleName === "qa")
+        redirectPath = "/dashboard/qa";
+      else if (roleName === "company-admin")
+        redirectPath = "/dashboard/company-admin";
+
+      // ✅ Save session
+      localStorage.setItem(
+        "rg_user",
+        JSON.stringify({
+          userId: user.id,
+          organizationId: organization.id,
+          role: roleName,
+        })
+      );
+
+      router.replace(redirectPath);
     } catch (err: any) {
       setError(err.message || "Login failed");
     } finally {
@@ -91,7 +162,9 @@ export default function LoginPage() {
     <div className={styles.wrapper}>
       <div className={styles.left}>
         <h1 className={styles.logo}>ReleaseGuard</h1>
-        <p className={styles.tagline}>Control your releases. Eliminate risk.</p>
+        <p className={styles.tagline}>
+          Control your releases. Eliminate risk.
+        </p>
       </div>
 
       <div className={styles.right}>
@@ -127,7 +200,11 @@ export default function LoginPage() {
             required
           />
 
-          <button type="submit" className={styles.submitButton} disabled={loading}>
+          <button
+            type="submit"
+            className={styles.submitButton}
+            disabled={loading}
+          >
             {loading ? "Signing in..." : "Login"}
           </button>
 
