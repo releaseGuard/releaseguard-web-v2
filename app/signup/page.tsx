@@ -17,19 +17,25 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [orgName, setOrgName] = useState("");
   const [orgCode, setOrgCode] = useState("");
-  const [role, setRole] = useState("QA");
+
+  // ✅ DEFAULT ROLE = ADMIN
+  const [role, setRole] = useState("admin");
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // ✅ Super Admin removed
   const rolesList = [
-    "Super Admin",
+    "admin",
     "QA Lead",
     "QA",
     "Dev Lead",
     "Dev",
     "Project Manager",
   ];
+
+  const normalizeRole = (r: string) =>
+    r.trim().toLowerCase().replace(/\s+/g, "-");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +44,7 @@ export default function SignupPage() {
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
+      const normalizedRole = normalizeRole(role);
 
       // =============================
       // 1️⃣ CHECK DUPLICATE EMAIL
@@ -91,7 +98,7 @@ export default function SignupPage() {
         .from("roles")
         .select("id")
         .eq("organization_id", orgId)
-        .eq("name", role)
+        .eq("name", normalizedRole)
         .maybeSingle();
 
       let roleId = "";
@@ -101,7 +108,7 @@ export default function SignupPage() {
           .from("roles")
           .insert({
             organization_id: orgId,
-            name: role,
+            name: normalizedRole,
             is_system_role: false,
             created_at: new Date().toISOString(),
           })
@@ -125,7 +132,7 @@ export default function SignupPage() {
           name: name.trim(),
           email: normalizedEmail,
           organization_id: orgId,
-          role_id: roleId, // ✅ NEW SYSTEM
+          role_id: roleId,
           status: "active",
           password: null,
           temp_password: null,
@@ -157,12 +164,12 @@ export default function SignupPage() {
       // =============================
       router.push(`/set-password?userId=${newUser.id}`);
 
-      // reset form
+      // reset
       setName("");
       setEmail("");
       setOrgName("");
       setOrgCode("");
-      setRole("QA");
+      setRole("admin");
 
     } catch (err: any) {
       setError(err.message || "Signup failed");

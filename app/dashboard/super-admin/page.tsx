@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import styles from "./dashboard.superadmin.module.css";
+import Image from "next/image"; // ✅ CHANGED
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -31,6 +32,7 @@ export default function SuperAdminDashboard() {
 
       const parsed = JSON.parse(session);
 
+      // ✅ only super-admin allowed here
       if (parsed.role !== "super-admin") {
         router.replace("/dashboard/company-admin");
         return;
@@ -62,10 +64,21 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className={styles.wrapper}>
+      {/* ================= SIDEBAR ================= */}
       <aside className={styles.sidebar}>
-        <div className={styles.logo}>ReleaseGuard Admin</div>
+        {/* ✅ LOGO FIXED */}
+        <div className={styles.logo}>
+          <Image
+            src="/img/RG_logo.png"
+            alt="ReleaseGuard Logo"
+            width={160}
+            height={50}
+            priority
+          />
+        </div>
       </aside>
 
+      {/* ================= MAIN ================= */}
       <div className={styles.main}>
         <header className={styles.topbar}>
           <div className={styles.pageTitle}>
@@ -78,7 +91,11 @@ export default function SuperAdminDashboard() {
               onClick={() => setShowDropdown(!showDropdown)}
             >
               {profileImage ? (
-                <img src={profileImage} className={styles.profileImage} />
+                <img
+                  src={profileImage}
+                  className={styles.profileImage}
+                  alt="profile"
+                />
               ) : (
                 firstName.charAt(0).toUpperCase()
               )}
@@ -89,6 +106,7 @@ export default function SuperAdminDashboard() {
                 <div className={styles.dropdownItem}>Profile</div>
                 <div className={styles.dropdownItem}>Theme</div>
                 <div className={styles.dropdownItem}>Change Password</div>
+
                 <div
                   className={styles.dropdownItem}
                   onClick={handleLogout}

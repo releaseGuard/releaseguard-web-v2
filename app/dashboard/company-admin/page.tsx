@@ -31,10 +31,14 @@ export default function DashboardPage() {
 
       const parsed = JSON.parse(session);
 
-      if (parsed.role !== "company-admin") {
-        router.replace("/dashboard/super-admin");
-        return;
-      }
+     // ✅ allow admin + company-admin
+if (
+  parsed.role !== "company-admin" &&
+  parsed.role !== "admin"
+) {
+  router.replace("/dashboard/super-admin");
+  return;
+}
 
       const { data } = await supabase
         .from("users")
